@@ -6,10 +6,7 @@ from tensorlayerx.nn import Linear, MaxPool2d
 W_init = tlx.initializers.TruncatedNormal(stddev=0.02)
 G_init = tlx.initializers.TruncatedNormal(mean=1.0, stddev=0.02)
 
-if tlx.get_device()[0][1] == 'CPU':
-  data_format = 'channels_last'
-else:
-  data_format = 'channels_first'
+data_format = 'channels_last'
 
 class ResidualBlock(Module):
 
@@ -52,9 +49,9 @@ class SRGAN_g(Module):
             data_format=data_format, b_init=None
         )
         self.bn1 = BatchNorm2d(num_features=64, act=None, gamma_init=G_init, data_format=data_format)
-        self.conv3 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format=data_format)
+        self.conv3 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format=data_format)#256
         self.subpiexlconv1 = SubpixelConv2d(data_format=data_format, scale=2, act=tlx.ReLU)
-        self.conv4 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format=data_format)
+        self.conv4 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format=data_format)#256
         self.subpiexlconv2 = SubpixelConv2d(data_format=data_format, scale=2, act=tlx.ReLU)
         self.conv5 = Conv2d(3, kernel_size=(1, 1), stride=(1, 1), act=tlx.Tanh, padding='SAME', W_init=W_init, data_format=data_format)
 
