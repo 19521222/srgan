@@ -1,20 +1,25 @@
 import os
-# os.environ['TL_BACKEND'] = 'tensorflow' # Just modify this line, easily switch to any framework! PyTorch will coming soon!
+os.environ['TL_BACKEND'] = 'tensorflow' # Just modify this line, easily switch to any framework! PyTorch will coming soon!
 # os.environ['TL_BACKEND'] = 'mindspore'
 # os.environ['TL_BACKEND'] = 'paddle'
-os.environ['TL_BACKEND'] = 'torch'
+# os.environ['TL_BACKEND'] = 'torch'
 import time
 import numpy as np
 import tensorlayerx as tlx
 from tensorlayerx.dataflow import Dataset, DataLoader
 from srgan import SRGAN_g, SRGAN_d
 from config import config
+from utils import *
 from tensorlayerx.vision.transforms import Compose, RandomCrop, Normalize, RandomFlipHorizontal, Resize, HWC2CHW
 import vgg
 from tensorlayerx.model import TrainOneStep
 from tensorlayerx.nn import Module
 import cv2
-tlx.set_device('GPU')
+import tensorflow as tf
+from tensorflow.python.ops.numpy_ops import np_config
+np_config.enable_numpy_behavior()
+tlx.set_device('CPU')
+# tlx.set_device('GPU')
 
 ###====================== HYPER-PARAMETERS ===========================###
 batch_size = 8
@@ -27,27 +32,33 @@ checkpoint_dir = "models"
 tlx.files.exists_or_mkdir(checkpoint_dir)
 
 hr_transform = Compose([
-    RandomCrop(size=(384, 384)),
+    RandomCrop(size=(256, 256)),
     RandomFlipHorizontal(),
 ])
-nor = Compose([Normalize(mean=(127.5), std=(127.5), data_format='HWC'),
-              HWC2CHW()])
 lr_transform = Resize(size=(96, 96))
+# nor = Compose([Normalize(mean=(127.5), std=(127.5), data_format='HWC'),HWC2CHW()])
+nor = Normalize(mean=(127.5), std=(127.5), data_format='HWC')
 
-train_hr_imgs = tlx.vision.load_images(path=config.TRAIN.hr_img_path, n_threads = 32)
+
+# train_hr_imgs = tlx.vision.load_images(path=config.TRAIN.hr_img_path, n_threads = 32)
+dataset_signature = tf.TensorSpec(shape=(256, 256, 3), dtype=tf.uint8)
+np_synla_4096 = np.load("/gdrive/MyDrive/Synla_4096.npy", mmap_mode='r')
+train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_4096, output_signature=(dataset_signature))
+dataset_train = train_hr_imgs.map(augment_images, num_parallel_calls=tf.data.AUTOTUNE)
+dataset_train = dataset_train.prefetch(tf.data.AUTOTUNE)
 
 class TrainData(Dataset):
-
     def __init__(self, hr_trans=hr_transform, lr_trans=lr_transform):
-        self.train_hr_imgs = train_hr_imgs
+        self.train_hr_imgs = list(dataset_train.as_numpy_iterator())
+
         self.hr_trans = hr_trans
         self.lr_trans = lr_trans
 
     def __getitem__(self, index):
-        img = self.train_hr_imgs[index]
-        hr_patch = self.hr_trans(img)
-        lr_patch = self.lr_trans(hr_patch)
-        return nor(lr_patch), nor(hr_patch)
+        lr_patch, hr_patch = self.train_hr_imgs[index]
+        # print(lr_patch.shape)
+        # print(hr_patch.shape)
+        return lr_patch, hr_patch
 
     def __len__(self):
         return len(self.train_hr_imgs)
@@ -112,8 +123,8 @@ VGG = vgg.VGG19(pretrained=True, end_with='pool4', mode='dynamic')
 # automatic init layers weights shape with input tensor.
 # Calculating and filling 'in_channels' of each layer is a very troublesome thing.
 # So, just use 'init_build' with input shape. 'in_channels' of each layer will be automaticlly set.
-G.init_build(tlx.nn.Input(shape=(8, 3, 96, 96)))
-D.init_build(tlx.nn.Input(shape=(8, 3, 384, 384)))
+G.init_build(tlx.nn.Input(shape=(None, None, None, 3)))
+D.init_build(tlx.nn.Input(shape=(None, None, None, 3)))
 
 
 def train():
