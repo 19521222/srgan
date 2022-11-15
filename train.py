@@ -14,15 +14,16 @@ from tensorlayerx.vision.transforms import Compose, RandomCrop, Normalize, Rando
 import vgg
 from tensorlayerx.model import TrainOneStep
 from tensorlayerx.nn import Module
+from google.colab.patches import cv2_imshow
 import cv2
 import tensorflow as tf
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
-tlx.set_device('CPU')
+# tlx.set_device('CPU')
 # tlx.set_device('GPU')
 
 ###====================== HYPER-PARAMETERS ===========================###
-batch_size = 8
+batch_size = 32
 n_epoch_init = config.TRAIN.n_epoch_init
 n_epoch = config.TRAIN.n_epoch
 # create folders to save result images and trained models
@@ -43,21 +44,21 @@ nor = Normalize(mean=(127.5), std=(127.5), data_format='HWC')
 # train_hr_imgs = tlx.vision.load_images(path=config.TRAIN.hr_img_path, n_threads = 32)
 dataset_signature = tf.TensorSpec(shape=(256, 256, 3), dtype=tf.uint8)
 np_synla_4096 = np.load("/gdrive/MyDrive/Synla_4096.npy", mmap_mode='r')
-train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_4096, output_signature=(dataset_signature))
-dataset_train = train_hr_imgs.map(augment_images, num_parallel_calls=tf.data.AUTOTUNE)
-dataset_train = dataset_train.prefetch(tf.data.AUTOTUNE)
+np_synla_1024 = np.load("/gdrive/MyDrive/Synla_1024.npy", mmap_mode='r')
 
 class TrainData(Dataset):
-    def __init__(self, hr_trans=hr_transform, lr_trans=lr_transform):
+    def __init__(self, mode = "Train"):
+        if mode == "Train":
+          train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_4096, output_signature=(dataset_signature))
+          dataset_train = train_hr_imgs.map(augment_images, num_parallel_calls=tf.data.AUTOTUNE)
+        else:
+          train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_1024, output_signature=(dataset_signature))
+          dataset_train = train_hr_imgs.map(augment_images_valid, num_parallel_calls=tf.data.AUTOTUNE)
+        dataset_train = dataset_train.prefetch(tf.data.AUTOTUNE)
         self.train_hr_imgs = list(dataset_train.as_numpy_iterator())
-
-        self.hr_trans = hr_trans
-        self.lr_trans = lr_trans
 
     def __getitem__(self, index):
         lr_patch, hr_patch = self.train_hr_imgs[index]
-        # print(lr_patch.shape)
-        # print(hr_patch.shape)
         return lr_patch, hr_patch
 
     def __len__(self):
@@ -126,7 +127,6 @@ VGG = vgg.VGG19(pretrained=True, end_with='pool4', mode='dynamic')
 G.init_build(tlx.nn.Input(shape=(None, None, None, 3)))
 D.init_build(tlx.nn.Input(shape=(None, None, None, 3)))
 
-
 def train():
     G.set_train()
     D.set_train()
@@ -178,34 +178,41 @@ def train():
 
 def evaluate():
     ###====================== PRE-LOAD DATA ===========================###
-    valid_hr_imgs = tlx.vision.load_images(path=config.VALID.hr_img_path )
+    valid_hr_imgs = TrainData("Valid")
     ###========================LOAD WEIGHTS ============================###
     G.load_weights(os.path.join(checkpoint_dir, 'g.npz'), format='npz_dict')
     G.set_eval()
     imid = 0  # 0: 企鹅  81: 蝴蝶 53: 鸟  64: 古堡
-    valid_hr_img = valid_hr_imgs[imid]
-    valid_lr_img = np.asarray(valid_hr_img)
-    hr_size1 = [valid_lr_img.shape[0], valid_lr_img.shape[1]]
-    valid_lr_img = cv2.resize(valid_lr_img, dsize=(hr_size1[1] // 4, hr_size1[0] // 4))
-    valid_lr_img_tensor = (valid_lr_img / 127.5) - 1  # rescale to ［－1, 1]
+    valid_lr_img, valid_hr_img = valid_hr_imgs[imid]
+    # print(valid_hr_img)
+    # valid_lr_img = np.asarray(valid_hr_img)
+    # hr_size1 = [valid_lr_img.shape[0], valid_lr_img.shape[1]]
+    # valid_lr_img = cv2.resize(valid_lr_img, dsize=(hr_size1[1] // 4, hr_size1[0] // 4))
 
-
-    valid_lr_img_tensor = np.asarray(valid_lr_img_tensor, dtype=np.float32)
-    valid_lr_img_tensor = np.transpose(valid_lr_img_tensor,axes=[2, 0, 1])
+    valid_lr_img_tensor = np.asarray(valid_lr_img, dtype=np.float32)
     valid_lr_img_tensor = valid_lr_img_tensor[np.newaxis, :, :, :]
     valid_lr_img_tensor= tlx.ops.convert_to_tensor(valid_lr_img_tensor)
     size = [valid_lr_img.shape[0], valid_lr_img.shape[1]]
 
     out = tlx.ops.convert_to_numpy(G(valid_lr_img_tensor))
-    out = np.asarray((out + 1) * 127.5, dtype=np.uint8)
-    out = np.transpose(out[0], axes=[1, 2, 0])
     print("LR size: %s /  generated HR size: %s" % (size, out.shape))  # LR size: (339, 510, 3) /  gen HR size: (1, 1356, 2040, 3)
     print("[*] save images")
-    tlx.vision.save_image(out, file_name='valid_gen.png', path=save_dir)
-    tlx.vision.save_image(valid_lr_img, file_name='valid_lr.png', path=save_dir)
-    tlx.vision.save_image(valid_hr_img, file_name='valid_hr.png', path=save_dir)
-    out_bicu = cv2.resize(valid_lr_img, dsize = [size[1] * 4, size[0] * 4], interpolation = cv2.INTER_CUBIC)
-    tlx.vision.save_image(out_bicu, file_name='valid_hr_cubic.png', path=save_dir)
+
+    out = np.squeeze(np.clip(((out - 0) / (1 - 0)) * 255, 0, 255).astype(np.uint8), axis=0)
+    print(out)
+    img = Image.fromarray(np.clip(np.array(out), 0, 255).astype(np.uint8))
+    img.save(os.path.join(save_dir, 'valid_gen.png'), fmt = 'png')
+
+    # cv2.imwrite(os.path.join(save_dir, 'valid_gen.png'), out)
+    # cv2.imwrite(os.path.join(save_dir, 'valid_lr.png'), valid_lr_img)
+    # cv2.imwrite(os.path.join(save_dir, 'valid_hr.png'), valid_hr_img)
+    # out_bicu = cv2.resize(valid_lr_img, dsize = [size[1] * 4, size[0] * 4], interpolation = cv2.INTER_CUBIC)
+    # cv2.imwrite(os.path.join(save_dir, 'valid_hr_cubic.png'), out_bicu)
+
+    # tlx.vision.save_image(out, file_name='valid_gen.png', path=save_dir)
+    # tlx.vision.save_image(valid_lr_img, file_name='valid_lr.png', path=save_dir)
+    # tlx.vision.save_image(valid_hr_img, file_name='valid_hr.png', path=save_dir)
+    # tlx.vision.save_image(out_bicu, file_name='valid_hr_cubic.png', path=save_dir)
 
 
 if __name__ == '__main__':
