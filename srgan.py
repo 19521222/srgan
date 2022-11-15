@@ -6,6 +6,10 @@ from tensorlayerx.nn import Linear, MaxPool2d
 W_init = tlx.initializers.TruncatedNormal(stddev=0.02)
 G_init = tlx.initializers.TruncatedNormal(mean=1.0, stddev=0.02)
 
+if tlx.get_device()[0][1] == 'CPU':
+  data_format = 'channels_last'
+else:
+  data_format = 'channels_first'
 
 class ResidualBlock(Module):
 
@@ -13,14 +17,14 @@ class ResidualBlock(Module):
         super(ResidualBlock, self).__init__()
         self.conv1 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn1 = BatchNorm2d(num_features=64, act=tlx.ReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn1 = BatchNorm2d(num_features=64, act=tlx.ReLU, gamma_init=G_init, data_format=data_format)
         self.conv2 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn2 = BatchNorm2d(num_features=64, act=None, gamma_init=G_init, data_format='channels_first')
+        self.bn2 = BatchNorm2d(num_features=64, act=None, gamma_init=G_init, data_format=data_format)
 
     def forward(self, x):
         z = self.conv1(x)
@@ -40,19 +44,19 @@ class SRGAN_g(Module):
         super(SRGAN_g, self).__init__()
         self.conv1 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), act=tlx.ReLU, padding='SAME', W_init=W_init,
-            data_format='channels_first'
+            data_format=data_format
         )
         self.residual_block = self.make_layer()
         self.conv2 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn1 = BatchNorm2d(num_features=64, act=None, gamma_init=G_init, data_format='channels_first')
-        self.conv3 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format='channels_first')
-        self.subpiexlconv1 = SubpixelConv2d(data_format='channels_first', scale=2, act=tlx.ReLU)
-        self.conv4 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format='channels_first')
-        self.subpiexlconv2 = SubpixelConv2d(data_format='channels_first', scale=2, act=tlx.ReLU)
-        self.conv5 = Conv2d(3, kernel_size=(1, 1), stride=(1, 1), act=tlx.Tanh, padding='SAME', W_init=W_init, data_format='channels_first')
+        self.bn1 = BatchNorm2d(num_features=64, act=None, gamma_init=G_init, data_format=data_format)
+        self.conv3 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format=data_format)
+        self.subpiexlconv1 = SubpixelConv2d(data_format=data_format, scale=2, act=tlx.ReLU)
+        self.conv4 = Conv2d(out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init, data_format=data_format)
+        self.subpiexlconv2 = SubpixelConv2d(data_format=data_format, scale=2, act=tlx.ReLU)
+        self.conv5 = Conv2d(3, kernel_size=(1, 1), stride=(1, 1), act=tlx.Tanh, padding='SAME', W_init=W_init, data_format=data_format)
 
     def make_layer(self):
         layer_list = []
@@ -89,26 +93,26 @@ class SRGAN_g2(Module):
         super(SRGAN_g2, self).__init__()
         self.conv1 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first'
+            data_format=data_format
         )
         self.residual_block = self.make_layer()
         self.conv2 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn1 = BatchNorm2d(act=None, gamma_init=G_init, data_format='channels_first')
-        self.upsample1 = UpSampling2d(data_format='channels_first', scale=(2, 2), method='bilinear')
+        self.bn1 = BatchNorm2d(act=None, gamma_init=G_init, data_format=data_format)
+        self.upsample1 = UpSampling2d(data_format=data_format, scale=(2, 2), method='bilinear')
         self.conv3 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn2 = BatchNorm2d(act=tlx.ReLU, gamma_init=G_init, data_format='channels_first')
-        self.upsample2 = UpSampling2d(data_format='channels_first', scale=(4, 4), method='bilinear')
+        self.bn2 = BatchNorm2d(act=tlx.ReLU, gamma_init=G_init, data_format=data_format)
+        self.upsample2 = UpSampling2d(data_format=data_format, scale=(4, 4), method='bilinear')
         self.conv4 = Conv2d(
             out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn3 = BatchNorm2d(act=tlx.ReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn3 = BatchNorm2d(act=tlx.ReLU, gamma_init=G_init, data_format=data_format)
         self.conv5 = Conv2d(
             out_channels=3, kernel_size=(1, 1), stride=(1, 1), act=tlx.Tanh, padding='SAME', W_init=W_init
         )
@@ -145,43 +149,43 @@ class SRGAN_d2(Module):
         super(SRGAN_d2, self).__init__()
         self.conv1 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(1, 1), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first'
+            W_init=W_init, data_format=data_format
         )
         self.conv2 = Conv2d(
             out_channels=64, kernel_size=(3, 3), stride=(2, 2), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn1 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn1 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.conv3 = Conv2d(
             out_channels=128, kernel_size=(3, 3), stride=(1, 1), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn2 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn2 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.conv4 = Conv2d(
             out_channels=128, kernel_size=(3, 3), stride=(2, 2), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn3 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn3 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.conv5 = Conv2d(
             out_channels=256, kernel_size=(3, 3), stride=(1, 1), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn4 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn4 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.conv6 = Conv2d(
             out_channels=256, kernel_size=(3, 3), stride=(2, 2), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn5 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn5 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.conv7 = Conv2d(
             out_channels=512, kernel_size=(3, 3), stride=(1, 1), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn6 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn6 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.conv8 = Conv2d(
             out_channels=512, kernel_size=(3, 3), stride=(2, 2), act=tlx.LeakyReLU(negative_slope=0.2), padding='SAME',
-            W_init=W_init, data_format='channels_first', b_init=None
+            W_init=W_init, data_format=data_format, b_init=None
         )
-        self.bn7 = BatchNorm2d(gamma_init=G_init, data_format='channels_first')
+        self.bn7 = BatchNorm2d(gamma_init=G_init, data_format=data_format)
         self.flat = Flatten()
         self.dense1 = Linear(out_features=1024, act=tlx.LeakyReLU(negative_slope=0.2))
         self.dense2 = Linear(out_features=1)
@@ -216,58 +220,58 @@ class SRGAN_d(Module):
         super(SRGAN_d, self).__init__()
         self.conv1 = Conv2d(
             out_channels=dim, kernel_size=(4, 4), stride=(2, 2), act=tlx.LeakyReLU, padding='SAME', W_init=W_init,
-            data_format='channels_first'
+            data_format=data_format
         )
         self.conv2 = Conv2d(
             out_channels=dim * 2, kernel_size=(4, 4), stride=(2, 2), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn1 = BatchNorm2d(num_features=dim * 2, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn1 = BatchNorm2d(num_features=dim * 2, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv3 = Conv2d(
             out_channels=dim * 4, kernel_size=(4, 4), stride=(2, 2), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn2 = BatchNorm2d(num_features=dim * 4, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn2 = BatchNorm2d(num_features=dim * 4, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv4 = Conv2d(
             out_channels=dim * 8, kernel_size=(4, 4), stride=(2, 2), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn3 = BatchNorm2d(num_features=dim * 8, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn3 = BatchNorm2d(num_features=dim * 8, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv5 = Conv2d(
             out_channels=dim * 16, kernel_size=(4, 4), stride=(2, 2), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn4 = BatchNorm2d(num_features=dim * 16, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn4 = BatchNorm2d(num_features=dim * 16, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv6 = Conv2d(
             out_channels=dim * 32, kernel_size=(4, 4), stride=(2, 2), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn5 = BatchNorm2d(num_features=dim * 32, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn5 = BatchNorm2d(num_features=dim * 32, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv7 = Conv2d(
             out_channels=dim * 16, kernel_size=(1, 1), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn6 = BatchNorm2d(num_features=dim * 16, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn6 = BatchNorm2d(num_features=dim * 16, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv8 = Conv2d(
             out_channels=dim * 8, kernel_size=(1, 1), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn7 = BatchNorm2d(num_features=dim * 8, act=None, gamma_init=G_init, data_format='channels_first')
+        self.bn7 = BatchNorm2d(num_features=dim * 8, act=None, gamma_init=G_init, data_format=data_format)
         self.conv9 = Conv2d(
             out_channels=dim * 2, kernel_size=(1, 1), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn8 = BatchNorm2d(num_features=dim * 2, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn8 = BatchNorm2d(num_features=dim * 2, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv10 = Conv2d(
             out_channels=dim * 2, kernel_size=(3, 3), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn9 = BatchNorm2d(num_features=dim * 2, act=tlx.LeakyReLU, gamma_init=G_init, data_format='channels_first')
+        self.bn9 = BatchNorm2d(num_features=dim * 2, act=tlx.LeakyReLU, gamma_init=G_init, data_format=data_format)
         self.conv11 = Conv2d(
             out_channels=dim * 8, kernel_size=(3, 3), stride=(1, 1), act=None, padding='SAME', W_init=W_init,
-            data_format='channels_first', b_init=None
+            data_format=data_format, b_init=None
         )
-        self.bn10 = BatchNorm2d(num_features=dim * 8, gamma_init=G_init, data_format='channels_first')
+        self.bn10 = BatchNorm2d(num_features=dim * 8, gamma_init=G_init, data_format=data_format)
         self.add = Elementwise(combine_fn=tlx.add, act=tlx.LeakyReLU)
         self.flat = Flatten()
         self.dense = Linear(out_features=1, W_init=W_init)
