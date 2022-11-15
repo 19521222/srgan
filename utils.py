@@ -282,9 +282,9 @@ def augment_images(img):
 
     hr_shape = tf.shape(hr)
     if tf.random.uniform(shape=()) < 0.5:
-        lr = tf.image.resize(lr, [hr_shape[-3]//4, hr_shape[-2]//4], method="area")
+        lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="area")
     else:
-        lr = tf.image.resize(lr, [hr_shape[-3]//4, hr_shape[-2]//4], method="bicubic")
+        lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="bicubic")
 
     if tf.random.uniform(shape=()) < 0.8:
         lr = degrade_rgb_to_yuv(lr, jpeg_factor=tf.experimental.numpy.random.randint(70, 90, dtype=tf.int32), chroma_subsampling=True, chroma_method="area")
@@ -300,6 +300,6 @@ def augment_images_valid(img):
     lr, hr = img, img
     
     hr_shape = tf.shape(hr)
-    lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="area")
-
+    lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="bicubic")
+    print(lr.shape, hr.shape)
     return lr, hr
