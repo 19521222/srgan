@@ -6,6 +6,9 @@ os.environ['TL_BACKEND'] = 'tensorflow' # Just modify this line, easily switch t
 import time
 import numpy as np
 import tensorlayerx as tlx
+import tensorflow as tf
+import cv2
+
 from tensorlayerx.dataflow import Dataset, DataLoader
 from srgan import SRGAN_g, SRGAN_d
 from config import config
@@ -15,8 +18,7 @@ import vgg
 from tensorlayerx.model import TrainOneStep
 from tensorlayerx.nn import Module
 from google.colab.patches import cv2_imshow
-import cv2
-import tensorflow as tf
+
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
 # tlx.set_device('CPU')
@@ -46,24 +48,20 @@ dataset_signature = tf.TensorSpec(shape=(256, 256, 3), dtype=tf.uint8)
 np_synla_4096 = np.load("/gdrive/MyDrive/Synla_4096.npy", mmap_mode='r')
 np_synla_1024 = np.load("/gdrive/MyDrive/Synla_1024.npy", mmap_mode='r')
 
-class TrainData(Dataset):
-    def __init__(self, mode = "Train"):
-        if mode == "Train":
-          train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_4096, output_signature=(dataset_signature))
-          dataset_train = train_hr_imgs.map(augment_images, num_parallel_calls=tf.data.AUTOTUNE)
-        else:
-          train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_1024, output_signature=(dataset_signature))
-          dataset_train = train_hr_imgs.map(augment_images_valid, num_parallel_calls=tf.data.AUTOTUNE)
-        dataset_train = dataset_train.prefetch(tf.data.AUTOTUNE)
-        self.train_hr_imgs = list(dataset_train.as_numpy_iterator())
+def TrainData(mode = "Train"):
+    if mode == "Train":
+      train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_4096, output_signature=(dataset_signature))
+      dataset = train_hr_imgs.map(augment_images, num_parallel_calls=tf.data.AUTOTUNE)
+      dataset = dataset.batch(batch_size)
+      # dataset = dataset.shuffle(4096 // batch_size)
+    else:
+      train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_1024, output_signature=(dataset_signature))
+      dataset = train_hr_imgs.map(augment_images_valid, num_parallel_calls=tf.data.AUTOTUNE)
+      dataset = dataset.batch(batch_size)
+      # dataset = dataset.shuffle(1024 // batch_size)
 
-    def __getitem__(self, index):
-        lr_patch, hr_patch = self.train_hr_imgs[index]
-        return lr_patch, hr_patch
-
-    def __len__(self):
-        return len(self.train_hr_imgs)
-
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    return dataset
 
 class WithLoss_init(Module):
     def __init__(self, G_net, loss_fn):
@@ -131,9 +129,9 @@ def train():
     G.set_train()
     D.set_train()
     VGG.set_eval()
+
     train_ds = TrainData()
-    train_ds_img_nums = len(train_ds)
-    train_ds = DataLoader(train_ds, batch_size=batch_size, shuffle=True, drop_last=True)
+    train_ds_img_nums = len(np_synla_4096)
 
     lr_v = tlx.optimizers.lr.StepDecay(learning_rate=0.05, step_size=1000, gamma=0.1, last_epoch=-1, verbose=True)
     g_optimizer_init = tlx.optimizers.Momentum(lr_v, 0.9)
@@ -151,13 +149,19 @@ def train():
     trainforD = TrainOneStep(net_with_loss_D, optimizer=d_optimizer, train_weights=d_weights)
 
     # initialize learning (G)
+    print("initialize learning")
     n_step_epoch = round(train_ds_img_nums // batch_size)
     for epoch in range(n_epoch_init):
         for step, (lr_patch, hr_patch) in enumerate(train_ds):
             step_time = time.time()
             loss = trainforinit(lr_patch, hr_patch)
-            print("Epoch: [{}/{}] step: [{}/{}] time: {:.3f}s, mse: {:.3f} ".format(
-                epoch, n_epoch_init, step, n_step_epoch, time.time() - step_time, float(loss)))
+            if step % 64 == 0:
+              psnr_p = _psnr_torch(G(lr_patch), hr_patch)
+              print("Epoch: [{}/{}] step: [{}/{}] time: {:.3f}s, mse: {:.3f}, psnr: {:.3f} ".format(
+                  epoch, n_epoch_init, step, n_step_epoch, time.time() - step_time, float(loss), float(psnr_p)))
+        if (epoch != 0) and (epoch % 10 == 0):
+            G.save_weights(os.path.join(checkpoint_dir, 'g.npz'), format='npz_dict')
+            D.save_weights(os.path.join(checkpoint_dir, 'd.npz'), format='npz_dict')
 
     # adversarial learning (G, D)
     n_step_epoch = round(train_ds_img_nums // batch_size)
