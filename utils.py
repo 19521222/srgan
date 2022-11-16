@@ -282,9 +282,9 @@ def augment_images(img):
 
     hr_shape = tf.shape(hr)
     if tf.random.uniform(shape=()) < 0.5:
-        lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="area")
+        lr = tf.image.resize(lr, [hr_shape[-3]//4, hr_shape[-2]//4], method="area")
     else:
-        lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="bicubic")
+        lr = tf.image.resize(lr, [hr_shape[-3]//4, hr_shape[-2]//4], method="bicubic")
 
     if tf.random.uniform(shape=()) < 0.8:
         lr = degrade_rgb_to_yuv(lr, jpeg_factor=tf.experimental.numpy.random.randint(70, 90, dtype=tf.int32), chroma_subsampling=True, chroma_method="area")
@@ -300,6 +300,29 @@ def augment_images_valid(img):
     lr, hr = img, img
     
     hr_shape = tf.shape(hr)
-    lr = tf.image.resize(lr, [hr_shape[-3]//2, hr_shape[-2]//2], method="bicubic")
-    print(lr.shape, hr.shape)
+    lr = tf.image.resize(lr, [hr_shape[-3]//4, hr_shape[-2]//4], method="bicubic")
     return lr, hr
+
+def _psnr_torch(raw_tensor, dst_tensor):
+    """Implements PSNR (Peak Signal-to-Noise Ratio, peak signal-to-noise ratio) function
+    Args:
+        raw_tensor (torch.Tensor): image tensor flow to be compared, RGB format, data range [0, 1]
+        dst_tensor (torch.Tensor): reference image tensorflow, RGB format, data range [0, 1]
+    Returns:
+        psnr_metrics (torch.Tensor): PSNR metrics
+    """
+    # Check if two tensor scales are similar
+    assert raw_tensor.shape == dst_tensor.shape
+
+    # Convert RGB tensor data to YCbCr tensor, and extract only Y channel data
+    raw_tensor = tf.image.rgb_to_yuv(raw_tensor)[..., 0]
+    dst_tensor = tf.image.rgb_to_yuv(dst_tensor)[..., 0]
+
+    # Convert data type to torch.float64 bit
+    raw_tensor = tf.cast(raw_tensor, tf.float64)
+    dst_tensor = tf.cast(dst_tensor, tf.float64)
+
+    mse_value = np.mean((raw_tensor * 255.0 - dst_tensor * 255.0) ** 2 + 1e-8)
+    psnr_metrics = 10 * np.log10(255.0 ** 2 / mse_value)
+
+    return psnr_metrics
