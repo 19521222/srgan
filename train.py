@@ -42,19 +42,18 @@ lr_transform = Resize(size=(96, 96))
 # nor = Compose([Normalize(mean=(127.5), std=(127.5), data_format='HWC'),HWC2CHW()])
 nor = Normalize(mean=(127.5), std=(127.5), data_format='HWC')
 
-
 # train_hr_imgs = tlx.vision.load_images(path=config.TRAIN.hr_img_path, n_threads = 32)
 dataset_signature = tf.TensorSpec(shape=(256, 256, 3), dtype=tf.uint8)
-np_synla_4096 = np.load("/gdrive/MyDrive/Synla_4096.npy", mmap_mode='r')
-np_synla_1024 = np.load("/gdrive/MyDrive/Synla_1024.npy", mmap_mode='r')
 
 def TrainData(mode = "Train"):
     if mode == "Train":
+      np_synla_4096 = np.load("/gdrive/MyDrive/Synla_4096.npy", mmap_mode='r')
       train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_4096, output_signature=(dataset_signature))
       dataset = train_hr_imgs.map(augment_images, num_parallel_calls=tf.data.AUTOTUNE)
       dataset = dataset.batch(batch_size)
       # dataset = dataset.shuffle(4096 // batch_size)
     else:
+      np_synla_1024 = np.load("/gdrive/MyDrive/Synla_1024.npy", mmap_mode='r')
       train_hr_imgs = tf.data.Dataset.from_generator(lambda: np_synla_1024, output_signature=(dataset_signature))
       dataset = train_hr_imgs.map(augment_images_valid, num_parallel_calls=tf.data.AUTOTUNE)
       dataset = dataset.batch(batch_size)
@@ -131,7 +130,7 @@ def train():
     VGG.set_eval()
 
     train_ds = TrainData()
-    train_ds_img_nums = len(np_synla_4096)
+    train_ds_img_nums = 4096
 
     lr_v = tlx.optimizers.lr.StepDecay(learning_rate=0.05, step_size=1000, gamma=0.1, last_epoch=-1, verbose=True)
     g_optimizer_init = tlx.optimizers.Momentum(lr_v, 0.9)
