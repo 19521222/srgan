@@ -155,7 +155,7 @@ def train():
             step_time = time.time()
             loss = trainforinit(lr_patch, hr_patch)
             if step % 64 == 0:
-              psnr_p = _psnr_torch(G(lr_patch), hr_patch)
+              psnr_p = psnr_torch(G(lr_patch), hr_patch)
               print("Epoch: [{}/{}] step: [{}/{}] time: {:.3f}s, mse: {:.3f}, psnr: {:.3f} ".format(
                   epoch, n_epoch_init, step, n_step_epoch, time.time() - step_time, float(loss), float(psnr_p)))
         if (epoch != 0) and (epoch % 10 == 0):
