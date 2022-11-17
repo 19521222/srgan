@@ -303,7 +303,7 @@ def augment_images_valid(img):
     lr = tf.image.resize(lr, [hr_shape[-3]//4, hr_shape[-2]//4], method="bicubic")
     return lr, hr
 
-def _psnr_torch(raw_tensor, dst_tensor):
+def psnr_torch(raw_tensor, dst_tensor):
     """Implements PSNR (Peak Signal-to-Noise Ratio, peak signal-to-noise ratio) function
     Args:
         raw_tensor (torch.Tensor): image tensor flow to be compared, RGB format, data range [0, 1]
